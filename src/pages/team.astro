@@ -11,14 +11,39 @@ type Member = {
   name: string; 
   role: string; 
   subdivision?: string; 
-  speciality: string;
-  about: string;
-  photo?: string;
+  speciality: string | null;
+  about: string | null;
+  photo?: string | null;
+  photoResolved?: string;
   socials: { github?: string; linkedin?: string; email?: string }
 };
 
-const mentor    = teamData['Mentors']?.[0] as Member | undefined;
-const allLeads  = (teamData['TeamLead'] as Member[]) ?? [];
+// Vite glob to find all images inside src/data/profilepic/
+const images = import.meta.glob<{ default: ImageMetadata }>('/src/data/profilepic/*.{jpeg,jpg,png,gif,webp}');
+
+async function resolvePhoto(photoName: string | null | undefined) {
+  if (!photoName) return '';
+  const path = `/src/data/profilepic/${photoName}`;
+  if (images[path]) {
+    const mod = await images[path]();
+    return mod.default.src;
+  }
+  return '';
+}
+
+// Pre-resolve all photos at build time
+const mentorRaw = teamData['Mentors']?.[0] as Member | undefined;
+const mentor = mentorRaw ? {
+  ...mentorRaw,
+  photoResolved: await resolvePhoto(mentorRaw.photo)
+} : undefined;
+
+const allLeadsRaw = (teamData['TeamLead'] as Member[]) ?? [];
+const allLeads = await Promise.all(allLeadsRaw.map(async (l) => ({
+  ...l,
+  photoResolved: await resolvePhoto(l.photo)
+})));
+
 const adminLead = allLeads.find(l => l.role === 'Administrative Lead');
 const techLead  = allLeads.find(l => l.role === 'Technical Lead');
 const teamLeads = allLeads.filter(l => l.role === 'Team Lead');
@@ -30,6 +55,16 @@ const subdivisionMap = [
   { key: 'Mechanical', label: 'Mechanical',  color: '#ea580c', teamLeadName: 'M Nikhil' },
   { key: 'Media',      label: 'Media',       color: '#e11d48', teamLeadName: 'Pragathi L' },
 ];
+
+// Pre-resolve all subdivision members
+const resolvedSubdivisions = {} as Record<string, Member[]>;
+for (const sub of subdivisionMap) {
+  const members = (teamData[sub.key] as Member[] | undefined) ?? [];
+  resolvedSubdivisions[sub.key] = await Promise.all(members.map(async (m) => ({
+    ...m,
+    photoResolved: await resolvePhoto(m.photo)
+  })));
+}
 
 function initials(name: string) {
   return name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
@@ -71,9 +106,9 @@ function initials(name: string) {
             class="pcard mentor-card interactive-card"
             data-name={mentor.name}
             data-role={mentor.role}
-            data-speciality={mentor.speciality}
-            data-about={mentor.about}
-            data-photo={mentor.photo || ""}
+            data-speciality={mentor.speciality || ""}
+            data-about={mentor.about || ""}
+            data-photo={mentor.photoResolved || ""}
             data-github={mentor.socials.github}
             data-linkedin={mentor.socials.linkedin}
             data-email={mentor.socials.email}
@@ -84,8 +119,8 @@ function initials(name: string) {
               <span class="pcard-name">{mentor.name}</span>
               <span class="pcard-role">{mentor.role}</span>
             </div>
-            <div class="pcard-avatar" style={mentor.photo ? `background: url(${mentor.photo}) center/cover no-repeat` : `background: linear-gradient(135deg, #f59e0b, #d97706)`}>
-              {!mentor.photo && initials(mentor.name)}
+            <div class="pcard-avatar" style={mentor.photoResolved ? `background: url(${mentor.photoResolved}) center/cover no-repeat` : `background: linear-gradient(135deg, #f59e0b, #d97706)`}>
+              {!mentor.photoResolved && initials(mentor.name)}
             </div>
           </div>
         </div>
@@ -95,6 +130,7 @@ function initials(name: string) {
       <div class="org-canvas org-chart-bg">
         <div class="org-tree-wrapper">
 
+          <!-- ── LEVEL 1: Technical Lead (Ekansh) ── -->
           <div class="org-root-row">
             {techLead && (
               <div class="root-node-container">
@@ -103,9 +139,9 @@ function initials(name: string) {
                   style="--accent: #0ea5e9"
                   data-name={techLead.name}
                   data-role={techLead.role}
-                  data-speciality={techLead.speciality}
-                  data-about={techLead.about}
-                  data-photo={techLead.photo || ""}
+                  data-speciality={techLead.speciality || ""}
+                  data-about={techLead.about || ""}
+                  data-photo={techLead.photoResolved || ""}
                   data-github={techLead.socials.github}
                   data-linkedin={techLead.socials.linkedin}
                   data-email={techLead.socials.email}
@@ -116,8 +152,8 @@ function initials(name: string) {
                     <span class="pcard-name">{techLead.name}</span>
                     <span class="pcard-role">{techLead.role}</span>
                   </div>
-                  <div class="pcard-avatar" style={techLead.photo ? `background: url(${techLead.photo}) center/cover no-repeat` : `background: linear-gradient(135deg, #38bdf8, #0284c7)`}>
-                    {!techLead.photo && initials(techLead.name)}
+                  <div class="pcard-avatar" style={techLead.photoResolved ? `background: url(${techLead.photoResolved}) center/cover no-repeat` : `background: linear-gradient(135deg, #38bdf8, #0284c7)`}>
+                    {!techLead.photoResolved && initials(techLead.name)}
                   </div>
                 </div>
 
@@ -130,9 +166,9 @@ function initials(name: string) {
                       style="--accent: #64748b"
                       data-name={adminLead.name}
                       data-role={adminLead.role}
-                      data-speciality={adminLead.speciality}
-                      data-about={adminLead.about}
-                      data-photo={adminLead.photo || ""}
+                      data-speciality={adminLead.speciality || ""}
+                      data-about={adminLead.about || ""}
+                      data-photo={adminLead.photoResolved || ""}
                       data-github={adminLead.socials.github}
                       data-linkedin={adminLead.socials.linkedin}
                       data-email={adminLead.socials.email}
@@ -143,8 +179,8 @@ function initials(name: string) {
                         <span class="pcard-name">{adminLead.name}</span>
                         <span class="pcard-role">{adminLead.role}</span>
                       </div>
-                      <div class="pcard-avatar" style={adminLead.photo ? `background: url(${adminLead.photo}) center/cover no-repeat` : `background: linear-gradient(135deg, #94a3b8, #475569)`}>
-                        {!adminLead.photo && initials(adminLead.name)}
+                      <div class="pcard-avatar" style={adminLead.photoResolved ? `background: url(${adminLead.photoResolved}) center/cover no-repeat` : `background: linear-gradient(135deg, #94a3b8, #475569)`}>
+                        {!adminLead.photoResolved && initials(adminLead.name)}
                       </div>
                     </div>
                   </div>
@@ -161,7 +197,7 @@ function initials(name: string) {
             {subdivisionMap.map(sub => {
               const tl = teamLeads.find(t => t.name === sub.teamLeadName);
               if (!tl) return null;
-              const members = teamData[sub.key] ?? [];
+              const members = resolvedSubdivisions[sub.key] ?? [];
               const pms     = members.filter(m => m.role === 'Project Manager');
               const mems    = members.filter(m => m.role === 'Member');
 
@@ -176,9 +212,9 @@ function initials(name: string) {
                     style={`--accent: ${sub.color}`}
                     data-name={tl.name}
                     data-role="Team Lead"
-                    data-speciality={tl.speciality}
-                    data-about={tl.about}
-                    data-photo={tl.photo || ""}
+                    data-speciality={tl.speciality || ""}
+                    data-about={tl.about || ""}
+                    data-photo={tl.photoResolved || ""}
                     data-github={tl.socials.github}
                     data-linkedin={tl.socials.linkedin}
                     data-email={tl.socials.email}
@@ -190,8 +226,8 @@ function initials(name: string) {
                       <span class="pcard-role">Team Lead</span>
                       <span class="pcard-sub">{sub.label}</span>
                     </div>
-                    <div class="pcard-avatar" style={tl.photo ? `background: url(${tl.photo}) center/cover no-repeat` : `background: linear-gradient(135deg, ${sub.color}aa, ${sub.color})`}>
-                      {!tl.photo && initials(tl.name)}
+                    <div class="pcard-avatar" style={tl.photoResolved ? `background: url(${tl.photoResolved}) center/cover no-repeat` : `background: linear-gradient(135deg, ${sub.color}aa, ${sub.color})`}>
+                      {!tl.photoResolved && initials(tl.name)}
                     </div>
                   </div>
 
@@ -207,9 +243,9 @@ function initials(name: string) {
                             style={`--accent: ${sub.color}`}
                             data-name={pm.name}
                             data-role="Project Manager"
-                            data-speciality={pm.speciality}
-                            data-about={pm.about}
-                            data-photo={pm.photo || ""}
+                            data-speciality={pm.speciality || ""}
+                            data-about={pm.about || ""}
+                            data-photo={pm.photoResolved || ""}
                             data-github={pm.socials.github}
                             data-linkedin={pm.socials.linkedin}
                             data-email={pm.socials.email}
@@ -220,8 +256,8 @@ function initials(name: string) {
                               <span class="pcard-name">{pm.name}</span>
                               <span class="pcard-role">Project Manager</span>
                             </div>
-                            <div class="pcard-avatar" style={pm.photo ? `background: url(${pm.photo}) center/cover no-repeat` : `background: linear-gradient(135deg, ${sub.color}88, ${sub.color}bb)`}>
-                              {!pm.photo && initials(pm.name)}
+                            <div class="pcard-avatar" style={pm.photoResolved ? `background: url(${pm.photoResolved}) center/cover no-repeat` : `background: linear-gradient(135deg, ${sub.color}88, ${sub.color}bb)`}>
+                              {!pm.photoResolved && initials(pm.name)}
                             </div>
                           </div>
                         </div>
@@ -235,9 +271,9 @@ function initials(name: string) {
                             style={`--accent: ${sub.color}`}
                             data-name={m.name}
                             data-role="Member"
-                            data-speciality={m.speciality}
-                            data-about={m.about}
-                            data-photo={m.photo || ""}
+                            data-speciality={m.speciality || ""}
+                            data-about={m.about || ""}
+                            data-photo={m.photoResolved || ""}
                             data-github={m.socials.github}
                             data-linkedin={m.socials.linkedin}
                             data-email={m.socials.email}
@@ -248,8 +284,8 @@ function initials(name: string) {
                               <span class="pcard-name">{m.name}</span>
                               <span class="pcard-role">Member</span>
                             </div>
-                            <div class="pcard-avatar" style={m.photo ? `background: url(${m.photo}) center/cover no-repeat` : `background: linear-gradient(135deg, ${sub.color}44, ${sub.color}77)`}>
-                              {!m.photo && initials(m.name)}
+                            <div class="pcard-avatar" style={m.photoResolved ? `background: url(${m.photoResolved}) center/cover no-repeat` : `background: linear-gradient(135deg, ${sub.color}44, ${sub.color}77)`}>
+                              {!m.photoResolved && initials(m.name)}
                             </div>
                           </div>
                         </div>
@@ -278,9 +314,9 @@ function initials(name: string) {
               style="--accent:#0ea5e9"
               data-name={m.name}
               data-role={m.role}
-              data-speciality={m.speciality}
-              data-about={m.about}
-              data-photo={m.photo || ""}
+              data-speciality={m.speciality || ""}
+              data-about={m.about || ""}
+              data-photo={m.photoResolved || ""}
               data-subdivision={m.subdivision || ""}
               data-github={m.socials.github}
               data-linkedin={m.socials.linkedin}
@@ -292,8 +328,8 @@ function initials(name: string) {
                 <span class="pcard-role">{m.role}</span>
                 {m.subdivision && <span class="pcard-sub">{m.subdivision}</span>}
               </div>
-              <div class="pcard-avatar" style={m.photo ? `background: url(${m.photo}) center/cover no-repeat` : `background:#0284c7`}>
-                {!m.photo && initials(m.name)}
+              <div class="pcard-avatar" style={m.photoResolved ? `background: url(${m.photoResolved}) center/cover no-repeat` : `background:#0284c7`}>
+                {!m.photoResolved && initials(m.name)}
               </div>
             </div>
           ))}
@@ -301,7 +337,7 @@ function initials(name: string) {
       </section>
 
       {subdivisionMap.map(sub => {
-        const members = teamData[sub.key] ?? [];
+        const members = resolvedSubdivisions[sub.key] ?? [];
         if (!members.length) return null;
         return (
           <section class="grid-section">
@@ -316,9 +352,9 @@ function initials(name: string) {
                   style={`--accent:${sub.color}`}
                   data-name={m.name}
                   data-role={m.role}
-                  data-speciality={m.speciality}
-                  data-about={m.about}
-                  data-photo={m.photo || ""}
+                  data-speciality={m.speciality || ""}
+                  data-about={m.about || ""}
+                  data-photo={m.photoResolved || ""}
                   data-subdivision={sub.label}
                   data-github={m.socials.github}
                   data-linkedin={m.socials.linkedin}
@@ -329,8 +365,8 @@ function initials(name: string) {
                     <span class="pcard-name">{m.name}</span>
                     <span class="pcard-role">{m.role}</span>
                   </div>
-                  <div class="pcard-avatar" style={m.photo ? `background: url(${m.photo}) center/cover no-repeat` : `background:${sub.color}`}>
-                    {!m.photo && initials(m.name)}
+                  <div class="pcard-avatar" style={m.photoResolved ? `background: url(${m.photoResolved}) center/cover no-repeat` : `background:${sub.color}`}>
+                    {!m.photoResolved && initials(m.name)}
                   </div>
                 </div>
               ))}
