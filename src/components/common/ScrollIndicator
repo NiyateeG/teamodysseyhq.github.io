@@ -1,0 +1,25 @@
+<style>
+	.scroll-indicator{
+		position:fixed;
+		bottom:0;
+		left:0;
+		width: 0%;
+		height: 8px;
+		background: white;
+		z-index: 9999;
+		transition: width 0.05s linear;
+	}
+</style>
+<div id="scrlind" class="scroll-indicator"></div>
+<script lang="ts">
+window.addEventListener("scroll",updateBar);
+function updateBar(): void {
+	const scrolltop=window.scrollY;
+	const docheight= document.documentElement.scrollHeight -window.innerHeight;
+	const progress=(scrolltop/docheight)*100;
+	const bar=document.getElementById("scrlind") as HTMLDivElement | null;
+	if (bar) {
+		bar.style.width=`${progress}%`;
+	}
+}
+</script>
